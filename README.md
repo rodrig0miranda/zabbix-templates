@@ -6,8 +6,8 @@ Repositório centralizado de templates otimizados para monitoramento de infraest
 
 O monitoramento está organizado por fabricante/tecnologia para facilitar a localização:
 
-* **/sophos**: Template para Firewalls Sophos (XG, XGS).
 * **/impressoras**: Template para impressoras de rede.
+* **/sophos**: Template para Firewalls Sophos (XG, XGS).
 * *(Em breve)* Outros templates de rede e servidores.
 
 ## 🛠️ Como utilizar
