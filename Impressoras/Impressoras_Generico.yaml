@@ -1,0 +1,562 @@
+zabbix_export:
+  version: '7.0'
+  template_groups:
+    - uuid: d3946f7107f14862a29e3e843fca2c99
+      name: Templates/Printers
+  templates:
+    - uuid: f59ec15677c5428ab0ea0f9ce1e9369f
+      template: Impressoras
+      name: Impressoras
+      description: 'Um template genérico para monitorar todas as impressoras e coletar as informações mais importantes.'
+      groups:
+        - name: Templates/Printers
+      items:
+        - uuid: cf69e33cd81f49e0b5a541fb0411494b
+          name: 'Contador de Paginas Impressas Por Dia'
+          type: CALCULATED
+          key: contador_impressoes_dia
+          delay: 0;h00m02
+          history: 60d
+          trends: 90d
+          units: Paginas
+          params: last(//prtMarkerLifeCount.1.1)
+          description: 'Coleta agendada as 00:02hs todos os dias.'
+          tags:
+            - tag: Application
+              value: 'Informacoes de Paginas Impressas por dia'
+        - uuid: 86ef99e14df64fc8b3ede904d417f75d
+          name: 'Contador de Paginas Impressas Por Mes'
+          type: CALCULATED
+          key: contador_impressoes_mes
+          delay: 0;md1h00m04
+          history: 60d
+          trends: 90d
+          units: Paginas
+          params: last(//prtMarkerLifeCount.1.1)
+          description: 'Coleta agendada as 00:04hs todo dia 1º de cada mês, conta o total das páginas impressas desde a última coleta total do mês.'
+          tags:
+            - tag: Application
+              value: 'Informacoes de Paginas Impressas mes'
+        - uuid: c50e2c9fba9a4d5dbb056bb08b6c2b52
+          name: 'Contador de Paginas Impressas Por Semana'
+          type: CALCULATED
+          key: contador_impressoes_semana
+          delay: 0;wd1h00m03
+          history: 60d
+          trends: 90d
+          units: Paginas
+          params: last(//prtMarkerLifeCount.1.1)
+          description: 'Coleta agendada as 00:03hs toda segunda feira de cada semana, conta o total das páginas impressas desde a última coleta total da semana.'
+          tags:
+            - tag: Application
+              value: 'Informacoes de Paginas Impressas Por Semana'
+        - uuid: 6f95cfcb59434ea9a53543d54a6af75b
+          name: '06. Status de Erro no Equipamento'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.25.3.5.1.2.1
+          key: hrPrinterDetectedErrorState
+          value_type: CHAR
+          trends: '0'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  // Pega o valor do SNMP (geralmente vem em Hexadecimal) e limpa os espaços
+                  var hex = value.replace(/[^0-9A-Fa-f]/g, '');
+                  
+                  // Se vier vazio ou tudo zero, a máquina ta sem erros
+                  if (!hex || hex.match(/^0+$/)) {
+                      return 'Sem Erros';
+                  }
+                  
+                  // Converte os dois primeiros bytes pra binário preenchendo os zeros com slice
+                  var bin = ('00000000' + parseInt(hex.substring(0, 2), 16).toString(2)).slice(-8);
+                  if (hex.length > 2) {
+                      bin += ('00000000' + parseInt(hex.substring(2, 4), 16).toString(2)).slice(-8);
+                  }
+                  
+                  var errors = [];
+                  
+                  // Mapeia os bits da esquerda pra direita
+                  if (bin[0] === '1') errors.push('Pouco Papel');
+                  if (bin[1] === '1') errors.push('Sem Papel');
+                  if (bin[2] === '1') errors.push('Pouco Toner');
+                  if (bin[3] === '1') errors.push('Sem Toner');
+                  if (bin[4] === '1') errors.push('Porta Aberta');
+                  if (bin[5] === '1') errors.push('Papel Atolado');
+                  if (bin[6] === '1') errors.push('Offline');
+                  if (bin[7] === '1') errors.push('Manutenção Solicitada');
+                  if (bin[8] === '1') errors.push('Bandeja de Entrada Ausente');
+                  if (bin[9] === '1') errors.push('Bandeja de Saída Ausente');
+                  if (bin[10] === '1') errors.push('Toner Ausente');
+                  
+                  return errors.length > 0 ? errors.join(', ') : 'Erro Desconhecido (' + hex + ')';
+          triggers:
+            - uuid: d662adce527f4b888c4210b2e3851be0
+              expression: 'last(/Impressoras/hrPrinterDetectedErrorState)<>"Sem Erros"'
+              name: 'Erro na Impressora {HOST.NAME}: {ITEM.LASTVALUE}'
+              priority: WARNING
+        - uuid: 6aeeb0901587490aa90db82c87fd6442
+          name: '14. Status Geral da Impressora'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.25.3.5.1.1.1
+          key: hrPrinterStatus.1
+          delay: 60m
+          history: 7d
+          trends: '0'
+          valuemap:
+            name: 'Status da impressora'
+          tags:
+            - tag: Application
+              value: 'Informacoes de Disponibilidade do Equipamento'
+        - uuid: c12c1f1470a74015b6e6e6d1e0037165
+          name: '08. Ping'
+          type: SIMPLE
+          key: icmpping
+          delay: '0;30s/{$INTERVALO_PING}'
+          history: 7d
+          valuemap:
+            name: UP/DOWN
+          tags:
+            - tag: Application
+              value: 'Informacoes de Disponibilidade do Equipamento'
+          triggers:
+            - uuid: b1fcf120808d4d61be5ca8fc89d7570d
+              expression: 'max(/Impressoras/icmpping,#3)=0'
+              name: 'A {HOST.NAME} nao Responde a Ping'
+              priority: AVERAGE
+        - uuid: ca0790979a274c6785d1632fb7380006
+          name: '010. Perda de Pacote'
+          type: SIMPLE
+          key: icmppingloss
+          delay: '0;30s/{$INTERVALO_PING}'
+          history: 7d
+          value_type: FLOAT
+          units: '%'
+          tags:
+            - tag: Application
+              value: 'Informacoes de Disponibilidade do Equipamento'
+          triggers:
+            - uuid: d9be9b32d0014709bce30a6a35fab251
+              expression: 'min(/Impressoras/icmppingloss,5m)>20'
+              name: 'A perda de ping está muito alta {HOST.NAME}'
+              priority: WARNING
+              dependencies:
+                - name: 'A {HOST.NAME} nao Responde a Ping'
+                  expression: 'max(/Impressoras/icmpping,#3)=0'
+        - uuid: bbb80a5de95448b3bb95ea4b6873d883
+          name: '09. Latencia'
+          type: SIMPLE
+          key: icmppingsec
+          delay: '0;30s/{$INTERVALO_PING}'
+          history: 7d
+          value_type: FLOAT
+          units: s
+          tags:
+            - tag: Application
+              value: 'Informacoes de Disponibilidade do Equipamento'
+          triggers:
+            - uuid: 179d3f34c92c4647bfc4a26722d86258
+              expression: 'avg(/Impressoras/icmppingsec,5m)>0.15'
+              name: 'O tempo de resposta é muito alta na Impressora {HOST.NAME}'
+              priority: WARNING
+              dependencies:
+                - name: 'A {HOST.NAME} nao Responde a Ping'
+                  expression: 'max(/Impressoras/icmpping,#3)=0'
+        - uuid: 4771273330ca4e9ca9460e6f850514b3
+          name: 'Paginas Impressas Por Dia'
+          type: CALCULATED
+          key: impressoes_dia
+          delay: '600'
+          history: 60d
+          trends: 90d
+          units: Paginas
+          params: last(//prtMarkerLifeCount.1.1)-last(//contador_impressoes_dia)
+          description: 'Coleta o total de impressões hoje.'
+          tags:
+            - tag: Application
+              value: 'Informacoes de Paginas Impressas por dia'
+        - uuid: c2967d69c9d74bb2827a601c42362d45
+          name: 'Paginas Impressas Por Mes'
+          type: CALCULATED
+          key: impressoes_mes
+          delay: '600'
+          history: 60d
+          trends: 90d
+          units: Paginas
+          params: last(//prtMarkerLifeCount.1.1)-last(//contador_impressoes_mes)
+          description: 'Coleta o total de impressões no mês.'
+          tags:
+            - tag: Application
+              value: 'Informacoes de Paginas Impressas mes'
+        - uuid: 41275bb995f94be884f758cd06de6bcd
+          name: 'Paginas Impressas Por Semana'
+          type: CALCULATED
+          key: impressoes_semana
+          delay: '600'
+          history: 60d
+          trends: 90d
+          units: Paginas
+          params: last(//prtMarkerLifeCount.1.1)-last(//contador_impressoes_semana)
+          description: 'Coleta o total de impressões esta semana.'
+          tags:
+            - tag: Application
+              value: 'Informacoes de Paginas Impressas Por Semana'
+        - uuid: 5f97543130ff4b8592f99373e03668d9
+          name: 'Preco Resmas Utilizadas Por Mes'
+          type: CALCULATED
+          key: preco_resmas_usadas_por_mes
+          delay: '600'
+          history: 60d
+          trends: 90d
+          params: 'last(//resmas_usadas_por_mes)*{$CUSTO_RESMA}'
+          description: 'Coleta o total de resmas utilizadas no mês.'
+          tags:
+            - tag: Application
+              value: 'Informacoes de Custo mensal'
+        - uuid: 13986b0e6e8247c4a5b95ce8b0ec22fa
+          name: '12. Painel da Impressora'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.43.16.5.1.2.1.1
+          key: prtConsoleDisplayBufferText.1.1
+          history: 7d
+          value_type: CHAR
+          trends: '0'
+          tags:
+            - tag: Application
+              value: 'Informacoes de Disponibilidade do Equipamento'
+        - uuid: 4f7edb6eb98e43a9a960a4686dd0ccad
+          name: 'Paginas Impressas Total'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.43.10.2.1.4.1.1
+          key: prtMarkerLifeCount.1.1
+          delay: '600'
+          history: 60d
+          trends: 90d
+          units: Paginas
+          tags:
+            - tag: Application
+              value: 'Informacoes de Paginas Impressas'
+        - uuid: bd3fe02595e844dfb3eea6486137d4d4
+          name: '13. Contador de Inicializações'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.43.10.2.1.5.1.1
+          key: prtMarkerPowerOnCount.1.1
+          delay: 60m
+          history: 7d
+          trends: '0'
+          tags:
+            - tag: Application
+              value: 'Informacoes de Disponibilidade do Equipamento'
+        - uuid: b962d667cc874dc7882361698e8e5a0f
+          name: 'Resmas Utilizadas Por Mes'
+          type: CALCULATED
+          key: resmas_usadas_por_mes
+          delay: '600'
+          history: 60d
+          trends: 90d
+          units: Resmas
+          params: last(//impressoes_mes)/500
+          description: 'Coleta o total de resmas utilizadas no mês.'
+          tags:
+            - tag: Application
+              value: 'Informacoes de Custo mensal'
+        - uuid: c0bda81c4c564235b6f7c320878c482d
+          name: '03. Numero de Serie do Equipamento'
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.2.1.43.5.1.1.17.1
+          key: serial_number
+          value_type: TEXT
+          trends: '0'
+          inventory_link: SERIALNO_A
+        - uuid: d2e2fe1f92c943c78bf20e6a42664bc3
+          name: '04. Informações de Contato'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.4.0
+          key: sysContato
+          value_type: TEXT
+          trends: '0'
+          inventory_link: CONTACT
+        - uuid: c6ad0e050a9b43d9b196f8f47f32570d
+          name: '05. Localização'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.6.0
+          key: sysLocal
+          value_type: TEXT
+          trends: '0'
+          inventory_link: LOCATION
+        - uuid: 7f4f906ead454462818d0a0c23995bc6
+          name: '07. MAC Address'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.2.2.1.6.1
+          key: sysMac
+          value_type: TEXT
+          trends: '0'
+          inventory_link: MACADDRESS_A
+        - uuid: a0c2005c038d404d82f847977d9ccbde
+          name: '02. Modelo do Equipamento'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.25.3.2.1.3.1
+          key: sysModelo
+          value_type: TEXT
+          trends: '0'
+        - uuid: fa4a107525f74381909c585be719d2a9
+          name: '01. Nome do Equipamento'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.5.0
+          key: sysName
+          value_type: TEXT
+          trends: '0'
+          inventory_link: NAME
+        - uuid: 66883baed4ae4dfe88a911feaca41077
+          name: '11. Uptime do Equipamento'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.3.0
+          key: sysUpTimeInstance
+          delay: '3600'
+          history: 7d
+          units: uptime
+          preprocessing:
+            - type: MULTIPLIER
+              parameters:
+                - '0.01'
+          tags:
+            - tag: Application
+              value: 'Informacoes de Disponibilidade do Equipamento'
+          triggers:
+            - uuid: d28d7be753d24d99aaa4e1490933f6e2
+              expression: last(/Impressoras/sysUpTimeInstance)<5m
+              name: 'A Impressora {HOST.NAME} Foi Reiniciada'
+              priority: INFO
+              dependencies:
+                - name: 'A {HOST.NAME} nao Responde a Ping'
+                  expression: 'max(/Impressoras/icmpping,#3)=0'
+        - uuid: 5ca842afad714105bf29cc58eb10a3fb
+          name: 'Custo Total ao Mes'
+          type: CALCULATED
+          key: valor_impressoes_mes
+          delay: '600'
+          history: 60d
+          value_type: FLOAT
+          trends: 90d
+          units: R$
+          params: 'last(//impressoes_mes)*{$CUSTO_PAGINA}'
+          description: 'Coleta o total de impressões no mês.'
+          tags:
+            - tag: Application
+              value: 'Informacoes de Custo mensal'
+      discovery_rules:
+        - uuid: 03e0dd6478534ae7b7ea4b4cce012e97
+          name: 'Descoberta de Suprimentos'
+          type: SNMP_AGENT
+          snmp_oid: 'discovery[{#SNMPVALUE},.1.3.6.1.2.1.43.11.1.1.6.1]'
+          key: prtMarkerSuppliesDescription
+          delay: 1h
+          lifetime: 1d
+          enabled_lifetime_type: DISABLE_NEVER
+          item_prototypes:
+            - uuid: 0fe2a40edd674bca81141270f1d95766
+              name: 'Suprimento {#SNMPVALUE} - Descrição'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.43.11.1.1.6.1.{#SNMPINDEX}'
+              key: 'prtMarkerSuppliesDescription[{#SNMPVALUE}]'
+              delay: '600'
+              history: 7d
+              value_type: CHAR
+              trends: '0'
+              tags:
+                - tag: Application
+                  value: 'Informacoes da Unidade'
+              trigger_prototypes:
+                - uuid: f9b4a31d1e1f469384516c2a8bd425d2
+                  expression: '(last(/Impressoras/prtMarkerSuppliesDescription[{#SNMPVALUE}],#1)<>last(/Impressoras/prtMarkerSuppliesDescription[{#SNMPVALUE}],#2))>0'
+                  name: 'A Unidade {ITEM.VALUE} Foi alterado na Impressora {HOSTNAME}'
+                  status: DISABLED
+                  priority: INFO
+                  manual_close: 'YES'
+            - uuid: e61b261be1db46f8b1bed00e2e484f61
+              name: 'Suprimento {#SNMPVALUE} - Nível de Capacidade'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.43.11.1.1.9.1.{#SNMPINDEX}'
+              key: 'prtMarkerSuppliesLevel[{#SNMPVALUE}]'
+              delay: '600'
+              history: 7d
+              value_type: FLOAT
+              valuemap:
+                name: 'Status Suprimento'
+              tags:
+                - tag: Application
+                  value: 'Informacoes de Nivel da unidade'
+            - uuid: 6cde0df7a18949f4b0225863405e2aa6
+              name: 'Suprimento {#SNMPVALUE} - Capacidade Máxima'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.43.11.1.1.8.1.{#SNMPINDEX}'
+              key: 'prtMarkerSuppliesMaxCapacity[{#SNMPVALUE}]'
+              delay: '600'
+              history: 7d
+              value_type: FLOAT
+              valuemap:
+                name: 'Status Suprimento'
+              tags:
+                - tag: Application
+                  value: 'Informacoes da Capacidade Maxima da Unidade'
+            - uuid: dc11889a6da44b459cf78ecee622afc3
+              name: 'Suprimento {#SNMPVALUE} - Nível ( Porcentagem)'
+              type: CALCULATED
+              key: 'TempodeVidautilUnit[{#SNMPVALUE}]'
+              delay: '900'
+              history: 90d
+              value_type: FLOAT
+              units: '%'
+              params: '100*last(//prtMarkerSuppliesLevel[{#SNMPVALUE}])/last(//prtMarkerSuppliesMaxCapacity[{#SNMPVALUE}])'
+              preprocessing:
+                - type: IN_RANGE
+                  parameters:
+                    - '0'
+                    - '100'
+                  error_handler: DISCARD_VALUE
+              tags:
+                - tag: Application
+                  value: 'Informacoes de Vida Util da Unidade'
+              trigger_prototypes:
+                - uuid: b13c868204a54fcfb47c5aa94039d588
+                  expression: 'last(/Impressoras/TempodeVidautilUnit[{#SNMPVALUE}])<{$UNIT_MINIMO}'
+                  name: 'Nivel do Toner {#SNMPVALUE} em {ITEM.VALUE}'
+                  status: DISABLED
+                  priority: WARNING
+                  manual_close: 'YES'
+      macros:
+        - macro: '{$CUSTO_PAGINA}'
+          value: '0.22'
+          description: 'Valor da página'
+        - macro: '{$CUSTO_RESMA}'
+          value: '20.00'
+          description: 'Valor da Resma'
+        - macro: '{$INTERVALO_PING}'
+          value: '1-5,08:00-18:00'
+        - macro: '{$UNIT_MINIMO}'
+          value: '10'
+          description: 'Valor do gatilho para a porcentagem mínima do Recurso'
+      valuemaps:
+        - uuid: 86de1028abe944e2a771d2ab46e5f85a
+          name: 'SNMP interface status (ifAdminStatus)'
+          mappings:
+            - value: '1'
+              newvalue: up
+            - value: '2'
+              newvalue: down
+            - value: '3'
+              newvalue: testing
+        - uuid: 657672ac73a04d02b4515182de0d0e48
+          name: 'Status da impressora'
+          mappings:
+            - value: '1'
+              newvalue: Outro
+            - value: '2'
+              newvalue: Desconhecido
+            - value: '3'
+              newvalue: Pronta
+            - value: '4'
+              newvalue: Imprimindo
+            - value: '5'
+              newvalue: Aquecendo
+        - uuid: e81e12c517594a1ab63c653fe1ef3e14
+          name: 'Status do dispositivo'
+          mappings:
+            - value: '1'
+              newvalue: 'Desconhecido (Unknown)'
+            - value: '2'
+              newvalue: 'Em operação (Running)'
+            - value: '3'
+              newvalue: 'Alerta (Warning)'
+            - value: '4'
+              newvalue: 'Em teste (Testing)'
+            - value: '5'
+              newvalue: 'Parado (Down)'
+        - uuid: 95822dc93f2e4b3e9e47a891c91487d5
+          name: 'Status Suprimento'
+          mappings:
+            - value: '-2'
+              newvalue: 'Capacidade Desconhecida'
+            - value: '-3'
+              newvalue: 'Nível Impreciso (Ok)'
+        - uuid: ae4ba85081504c378e756e5501cfe762
+          name: UP/DOWN
+          mappings:
+            - value: '0'
+              newvalue: DOWN
+            - value: '1'
+              newvalue: UP
+  graphs:
+    - uuid: 9bb8d41b54e34d3184f60d3d73c40c2b
+      name: '01- Disponibilidade'
+      graph_items:
+        - drawtype: FILLED_REGION
+          color: 1A7C11
+          item:
+            host: Impressoras
+            key: icmpping
+    - uuid: a6c0265bd95845db841d12bdc5bc28f3
+      name: '02- Latencia'
+      graph_items:
+        - drawtype: FILLED_REGION
+          color: 1A7C11
+          item:
+            host: Impressoras
+            key: icmppingsec
+    - uuid: fe59c2d5d8634462b1a4e40fb4688715
+      name: '03- Perda de Pacote ( Porcentagem )'
+      graph_items:
+        - drawtype: FILLED_REGION
+          color: 1A7C11
+          item:
+            host: Impressoras
+            key: icmppingloss
+    - uuid: 966f60eee6c44fb69c85acb002619bcc
+      name: '04- Tempo Ligado do Equipamento'
+      graph_items:
+        - drawtype: FILLED_REGION
+          color: 1A7C11
+          item:
+            host: Impressoras
+            key: sysUpTimeInstance
+    - uuid: 92e7c530b7b940f19db2fc688b3cb474
+      name: '05- Paginas Impressas Total'
+      graph_items:
+        - drawtype: FILLED_REGION
+          color: 1A7C11
+          item:
+            host: Impressoras
+            key: prtMarkerLifeCount.1.1
+    - uuid: 37f90935cfa1492cad19625b81a4e66f
+      name: '06- Paginas Impressas Por Dia'
+      graph_items:
+        - drawtype: FILLED_REGION
+          color: 1A7C11
+          item:
+            host: Impressoras
+            key: impressoes_dia
+    - uuid: 95a01e60121b40e98ec6bfb56c95cea0
+      name: '07- Paginas Impressas Por Semana'
+      graph_items:
+        - drawtype: FILLED_REGION
+          color: 1A7C11
+          item:
+            host: Impressoras
+            key: impressoes_semana
+    - uuid: 03c2c4abdc8c4ae9b8e89bb4377d4232
+      name: '08- Paginas Impressas Por Mes'
+      graph_items:
+        - drawtype: FILLED_REGION
+          color: 1A7C11
+          item:
+            host: Impressoras
+            key: impressoes_mes
+    - uuid: 6c84ab819af44958b6086d0301499669
+      name: '09- Custo Total ao Mes'
+      graph_items:
+        - drawtype: FILLED_REGION
+          color: 1A7C11
+          item:
+            host: Impressoras
+            key: valor_impressoes_mes
