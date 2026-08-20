@@ -50,10 +50,74 @@ zabbix_export:
           history: 60d
           value_type: LOG
           trends: '0'
+        - uuid: eecd98d241694ecb8d756a8c152ea750
+          name: '7.8 - SNMP Traps - Sophos - Auditoria Administrativa (Admin/Config/Shutdown)'
+          type: SNMP_TRAP
+          key: 'snmptrap["Admin.*created|administrator|Changes made through the web admin|System restart|System shutdown"]'
+          delay: '0'
+          history: 60d
+          value_type: LOG
+          trends: '0'
+          preprocessing:
+            - type: REGEX
+              parameters:
+                - 'Message\s*:\s*(.*)"'
+                - \1
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1s
+        - uuid: b846147b9437449894c0893ae9b12ce1
+          name: '7.4 - SNMP Traps - Detecção de Malware (Alert 8001)'
+          type: SNMP_TRAP
+          key: 'snmptrap["Alert_Id : (8001|08001)"]'
+          delay: '0'
+          history: 60d
+          value_type: LOG
+          trends: '0'
+          preprocessing:
+            - type: REGEX
+              parameters:
+                - 'Message\s*:\s*(.*)"'
+                - \1
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1s
+        - uuid: b9aa4eba053a4714bd3bd302ef185601
+          name: '7.6 - SNMP Traps - IPS / Ataque ou Intrusão Detectada (Alerts 18001|18002|18003)'
+          type: SNMP_TRAP
+          key: 'snmptrap["Alert_Id : (18001|18002|18003)"]'
+          delay: '0'
+          history: 60d
+          value_type: LOG
+          trends: '0'
+          preprocessing:
+            - type: REGEX
+              parameters:
+                - 'Message\s*:\s*(.*)"'
+                - \1
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1s
         - uuid: 514933b7e0bc493cba49c90f92efb507
           name: '7.1 - SNMP Traps - Erro de Login (Alert 17507)'
           type: SNMP_TRAP
           key: 'snmptrap["Alert_Id : 17507"]'
+          delay: '0'
+          history: 60d
+          value_type: LOG
+          trends: '0'
+          preprocessing:
+            - type: REGEX
+              parameters:
+                - 'Message\s*:\s*(.*)"'
+                - \1
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1s
+        - uuid: 418981bfa4e24c7ea397ad352d6b71a5
+          name: '7.5 - SNMP Traps - IP Bloqueado por Força Bruta (Login Lockout - Alert 17913)'
+          type: SNMP_TRAP
+          key: 'snmptrap["Alert_Id : 17913"]'
           delay: '0'
           history: 60d
           value_type: LOG
@@ -79,6 +143,22 @@ zabbix_export:
               parameters:
                 - 'Message\s*:\s*(.*)"'
                 - \1
+        - uuid: 96976e780dcf49239ee1a626acc51142
+          name: '7.7 - SNMP Traps - Falha de Atualização de Assinaturas (Pattern Update Failed)'
+          type: SNMP_TRAP
+          key: 'snmptrap["Pattern update failed|Signature update failed|Up2date failed|failed to download"]'
+          delay: '0'
+          history: 60d
+          value_type: LOG
+          trends: '0'
+          preprocessing:
+            - type: REGEX
+              parameters:
+                - 'Message\s*:\s*(.*)"'
+                - \1
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1s
         - uuid: f2a3fac92f6d4189b25547a619db8f11
           name: '7.2 - SNMP Traps - VPN SSL (Alert 17824 e 17825)'
           type: SNMP_TRAP
