@@ -42,6 +42,59 @@ zabbix_export:
           delay: 15s
           value_type: FLOAT
           units: s
+        - uuid: 95ddf04a938b4ed2a826e475c3c0bf6d
+          name: '7.9 - SNMP Traps - Fallback'
+          type: SNMP_TRAP
+          key: snmptrap.fallback
+          delay: '0'
+          history: 60d
+          value_type: LOG
+          trends: '0'
+        - uuid: 514933b7e0bc493cba49c90f92efb507
+          name: '7.1 - SNMP Traps - Erro de Login (Alert 17507)'
+          type: SNMP_TRAP
+          key: 'snmptrap["Alert_Id : 17507"]'
+          delay: '0'
+          history: 60d
+          value_type: LOG
+          trends: '0'
+          preprocessing:
+            - type: REGEX
+              parameters:
+                - 'Message\s*:\s*(.*)"'
+                - \1
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1s
+        - uuid: 1f29795ec2144e34b8d5c79da35d2cc8
+          name: '7.3 - SNMP Traps - Ameaça Bloqueada (Active Threat Response - Alert 18010)'
+          type: SNMP_TRAP
+          key: 'snmptrap["Alert_Id : 18010"]'
+          delay: '0'
+          history: 60d
+          value_type: LOG
+          trends: '0'
+          preprocessing:
+            - type: REGEX
+              parameters:
+                - 'Message\s*:\s*(.*)"'
+                - \1
+        - uuid: f2a3fac92f6d4189b25547a619db8f11
+          name: '7.2 - SNMP Traps - VPN SSL (Alert 17824 e 17825)'
+          type: SNMP_TRAP
+          key: 'snmptrap["SSL VPN User"]'
+          delay: '0'
+          history: 60d
+          value_type: LOG
+          trends: '0'
+          preprocessing:
+            - type: REGEX
+              parameters:
+                - 'Message\s*:\s*SSL VPN User\s*''([^'']+)''\s*(connected|disconnected)'
+                - 'VPN SSL: Usuário \1 - \2 '
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1s
         - uuid: bf19e21d89594a09827ea4bcefb4b246
           name: '2.3 - Uso de CPU -  Media'
           type: CALCULATED
